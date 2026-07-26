@@ -17,10 +17,12 @@ ESPHome Firmware für motorisierte IKEA Fridans Raffstores mit ESP32-WROOM-32D.
 
 | Komponente | Spezifikation |
 |------------|---------------|
-| MCU | ESP32 |
+| MCU | ESP32 (optional: ESP32-C3 SuperMini) |
 | Motortreiber | DRV8833 H-Bridge |
 | Motor | GA12-N20 DC mit Rotary Encoder (39RPM @ 6V) |
 | Stromversorgung | 5V USB-C |
+
+> 💡 **ESP32-C3 SuperMini:** Als Alternative zum normalen ESP32 kann auch ein ESP32-C3 SuperMini verwendet werden. Der C3 ist kleiner und günstiger, hat aber weniger GPIO-Pins. Die in dieser YAML verwendeten Pins (GPIO4, 14, 16, 26, 27) sind auf dem C3 verfügbar. Bei Verwendung des C3 muss in der YAML `variant: esp32` auf `variant: esp32c3` geändert werden. Achtung: Der C3 SuperMini hat USB-C — bei manchen Boards gibt es Defekte am USB-C Connector, die zu Boot-Loops führen.
 
 ### Pinout
 

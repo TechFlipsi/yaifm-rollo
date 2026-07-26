@@ -5,6 +5,7 @@
 # Hardware:
 #   ESP32 + DRV8833 H-Bridge + GA12-N20 DC Motor mit Encoder
 #   5V USB-C Stromversorgung
+#   Optional: ESP32-C3 SuperMini funktioniert ebenfalls (Pins müssen ggf. angepasst werden)
 #
 # Pinout:
 #   GPIO14 -> DRV8833 IN1 (Motor forward PWM)
