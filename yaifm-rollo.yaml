@@ -373,7 +373,7 @@ number:
     restore_value: true
     initial_value: 70000
     min_value: 0
-    max_value: 500000
+    max_value: 1000000
     step: 1000
     set_action:
       - globals.set:
