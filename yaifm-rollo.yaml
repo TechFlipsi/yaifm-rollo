@@ -162,7 +162,7 @@ globals:
   # Persistente (überleben Reboot/Stromausfall)
   - id: blind_encoder_rel_closed_fully
     type: int
-    initial_value: '70000'
+    initial_value: '152000'
     restore_value: yes
   - id: blind_encoder_rel_current
     type: float
@@ -376,7 +376,7 @@ number:
     id: blind_encoder_rel_closed_fully_number
     optimistic: true
     restore_value: true
-    initial_value: 70000
+    initial_value: 152000
     min_value: 0
     max_value: 1000000
     step: 1000
