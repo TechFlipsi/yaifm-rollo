@@ -333,7 +333,7 @@ script:
                       value: '0.0f'
                   - if:
                       condition:
-                        lambda: 'return id(old_current_blind_operation) < 0;'
+                        lambda: 'return id(auto_level_active) && id(old_current_blind_operation) < 0;'
                       then:
                         # Warten bis Motor ausläuft (Trägheit/Schwerkraft)
                         - delay: 800ms
