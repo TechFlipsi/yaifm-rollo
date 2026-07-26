@@ -198,7 +198,46 @@ Diese Lösung ist zuverlässiger als Software-PWM auf 0 zu setzen, weil der ESP3
 
 ## Lizenz
 
-GPL-3.0 — siehe [LICENSE](LICENSE)
+Dieses Projekt verwendet eine doppelte Lizenz:
+
+- **Software** (ESPHome YAML, Skripte, Dokumentation): **GPL-3.0** — siehe [LICENSE](LICENSE)
+- **3D-Druck-Dateien** (STL im Ordner `/stl/`): **CC-BY-4.0** — Original-Designs von [AndBu/YAIFM](https://github.com/AndBu/YAIFM)
+
+## 3D-Druck-Dateien (STL)
+
+Die STL-Dateien liegen im Ordner [`stl/`](stl/) und können direkt herunterladen und gedruckt werden.
+
+> ⚠️ **WICHTIG: Diese STL-Dateien sind NICHT von uns!** Sie stammen vom Original-Projekt [AndBu/YAIFM](https://github.com/AndBu/YAIFM) und wurden von uns unverändert übernommen. Wir hosten sie hier nur als Bequemlichkeit damit man alles an einem Ort hat. Die Designs stehen unter **CC-BY-4.0** (Creative Commons Attribution 4.0 International). Alle Urheberrechte liegen beim Original-Autor AndBu.
+
+| Datei | Beschreibung |
+|-------|--------------|
+| `YAIFM_motor_holder.stl` | Halterung für den GA12-N20 Motor im Rollo-Rohr |
+| `YAIFM_hub.stl` | Adapter-Hub für die Motorwelle auf das Rollo |
+| `YAIFM_lid.stl` | Deckel für die Motor-Halterung |
+| `YAIFM_clip.stl` | Befestigungs-Clip |
+| `YAIFM_PCB_holder.stl` | Halterung für eine kleine Platine (optional) |
+| `YAIFM_switch_holder.stl` | Halterung für den Endstop-Schalter (nur beim Original, wir verwenden keinen) |
+| `motor_holder_for_switch_holder.stl` | Motor-Halterung mit Endstop-Integration |
+| `YAIFM_tolerance_checker__hub.stl` | Toleranz-Tester für den Hub (vor dem Druck testen!) |
+
+### Hub-Toleranzen (`stl/different_hub_hole_clearances/`)
+
+Da jeder 3D-Drucker etwas unterschiedliche Maße produziert, gibt es den Hub in verschiedenen Toleranzen:
+
+| Datei | Toleranz |
+|-------|----------|
+| `YAIFM_hub_minus_0.05mm_hole_clearance.stl` | 0.05mm enger |
+| `YAIFM_hub_plus_0.05mm_hole_clearance.stl` | 0.05mm weiter |
+| `YAIFM_hub_plus_0.1mm_hole_clearance.stl` | 0.1mm weiter |
+
+> 💡 **Tipp:** Erst den `YAIFM_tolerance_checker__hub.stl` drucken und testen welche Toleranz am besten auf euren Drucker und euer Rollo passt. Dann den passenden Hub auswählen.
+
+### Druck-Empfehlungen
+
+- **Material:** PLA oder PETG
+- **Schichtdicke:** 0.2mm
+- **Füllung:** 30-40% (Motor-Halterung), 20% (Hub/Deckel)
+- **Support:** Nur bei der Motor-Halterung falls nötig
 
 ## Danksagung
 
