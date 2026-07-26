@@ -17,7 +17,7 @@ ESPHome Firmware für motorisierte IKEA Fridans Raffstores mit ESP32-WROOM-32D.
 
 | Komponente | Spezifikation |
 |------------|---------------|
-| MCU | ESP32-WROOM-32D |
+| MCU | ESP32 |
 | Motortreiber | DRV8833 H-Bridge |
 | Motor | GA12-N20 DC mit Rotary Encoder (39RPM @ 6V) |
 | Stromversorgung | 5V USB-C |

@@ -1,9 +1,9 @@
-# YAIFM - IKEA Fridans Rollo Motorisierung (ESP32-WROOM-32D)
+# YAIFM - IKEA Fridans Rollo Motorisierung (ESP32)
 # Fork von AndBu/YAIFM - ned14 Architektur, kein Endstop, Stall-Detection
 # GPL-3.0 Licensed
 #
 # Hardware:
-#   ESP32-WROOM-32D + DRV8833 H-Bridge + GA12-N20 DC Motor mit Encoder
+#   ESP32 + DRV8833 H-Bridge + GA12-N20 DC Motor mit Encoder
 #   5V USB-C Stromversorgung
 #
 # Pinout:
