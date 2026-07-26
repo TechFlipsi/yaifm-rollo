@@ -110,6 +110,11 @@ Dies ist ein Fork/Neuimplementierung basierend auf zwei Projekten:
 | Framework | Arduino | ESPHome (ESP-IDF) |
 | HA Integration | Cover (basic) | Cover mit Position 0-100% + Buttons |
 | Sicherheits-Sperre | Keine | Schließen blockiert wenn Referenz ungültig |
+| NOT-AUS | Keine | Motor + Driver sofort aus |
+| Test-Buttons | Keine | Motor Hoch/Runter (2s Testlauf) |
+| Motorgeschwindigkeit | Fest | Konfigurierbar 20-100% über HA |
+| EEP Driver Enable | Nicht verwendet | DRV8833 Sleep/Enable (GPIO26) |
+| Neustart-Button | Keine | ESP32 Remote-Reboot über HA |
 
 ### Unterschiede zur Vorlage (ned14)
 | Feature | ned14 | Diese Version |
@@ -117,5 +122,11 @@ Dies ist ein Fork/Neuimplementierung basierend auf zwei Projekten:
 | NVS-Persistenz | Encoder-Wert | Encoder-Wert + Referenz + Kalibrierung |
 | Boot-Verhalten | Immer Auto-Level | Auto-Level nur bei ungültiger Referenz |
 | Close-Sperre | Keine | Blockiert wenn Referenz ungültig |
-| HA Toleranz | 0.1% | 2% (verhindert falsche "offen" Anzeige) |
+| Position-Sperre | Keine | Blockiert wenn Referenz ungültig |
+| Bewegungs-Sperre | Keine | Blockiert wenn Kalibrierung 0 (NVS korrupt) |
+| HA Toleranz | 0.1% (99.9% = CLOSED) | 2% (98% = CLOSED) — verhindert falsche "offen" Anzeige |
 | EEP Driver | Nicht verwendet | DRV8833 Sleep/Enable Pin (GPIO26) |
+| NOT-AUS | Keine | Motor + Driver sofort aus |
+| Test-Buttons | Keine | Motor Hoch/Runter (2s Testlauf) |
+| Neustart-Button | Keine | ESP32 Remote-Reboot über HA |
+| Motorgeschwindigkeit | Fest | Konfigurierbar 20-100% über HA Number-Entity |
