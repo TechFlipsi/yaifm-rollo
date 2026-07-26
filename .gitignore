@@ -1,0 +1,12 @@
+# Ignoriere private Daten
+secrets.yaml
+*.secret
+.env
+
+# ESPHome Build-Artefakte
+.esphome/
+__pycache__/
+
+# OS Dateien
+.DS_Store
+Thumbs.db

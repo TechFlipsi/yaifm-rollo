@@ -1,0 +1,508 @@
+# YAIFM - IKEA Fridans Rollo Motorisierung (ESP32-WROOM-32D)
+# Fork von AndBu/YAIFM - ned14 Architektur, kein Endstop, Stall-Detection
+# GPL-3.0 Licensed
+#
+# Hardware:
+#   ESP32-WROOM-32D + DRV8833 H-Bridge + GA12-N20 DC Motor mit Encoder
+#   5V USB-C Stromversorgung
+#
+# Pinout:
+#   GPIO14 -> DRV8833 IN1 (Motor forward PWM)
+#   GPIO27 -> DRV8833 IN2 (Motor backward PWM)
+#   GPIO16 -> Encoder C1 (Phase A)
+#   GPIO4  -> Encoder C2 (Phase B)
+#   GPIO26 -> DRV8833 EEP (Sleep/Enable)
+#   3.3V   -> Encoder VCC
+#   GND    -> Encoder GND + DRV8833 GND
+#
+# Logik:
+#   - KEIN Endstop - beide Richtungen stoppen über Encoder-Werte + Stall-Detection
+#   - Stall = Encoder bewegt sich 250ms nicht während Motor läuft -> Motor aus
+#   - Slow-down: 25% Speed nahe Ziel (innerhalb 1000 Ticks)
+#   - Position 0.0 = offen (oben), 1.0 = geschlossen (unten)
+#   - Auto-Level beim ersten Boot: hoch bis Stall -> Referenz gesetzt
+#   - Position + Kalibrierung werden im NVS (Flash) gespeichert -> überlebt Stromausfall
+#   - Schließen blockiert wenn Referenz ungültig (Sicherheitsfeature)
+#
+# Einrichtung:
+#   1. secrets.yaml anlegen (siehe secrets.yaml.example)
+#   2. ESP32 flashen
+#   3. Beim ersten Boot läuft Auto-Level automatisch (hoch bis Stall)
+#   4. Rollo runterfahren bis es stoppt (Stall oder Encoder-Grenze)
+#   5. Button "Position als Unten speichern" drücken
+#   6. Fertig - Rollo ist einsatzbereit
+#
+# Home Assistant Integration:
+#   - Cover Entity mit Positionsanzeige (0-100%)
+#   - Slider für Positionierung
+#   - Buttons: Auto-Level, Position speichern, NOT-AUS, Neustart
+#   - Number-Entities: Schritte bis geschlossen, Motorgeschwindigkeit
+
+esphome:
+  name: yaifm-rollo
+  friendly_name: YAIFM Rollo
+  on_boot:
+    priority: 799
+    then:
+      # Motor sofort aus
+      - switch.turn_off: driver_enable
+      - output.set_level:
+          id: mot_fwd
+          level: 0%
+      - output.set_level:
+          id: mot_rev
+          level: 0%
+      # Driver aktivieren
+      - delay: 2s
+      - switch.turn_on: driver_enable
+      - delay: 1s
+      # Auto-Level NUR wenn Referenz ungültig (Stromausfall/Erststart)
+      - if:
+          condition:
+            lambda: 'return id(blind_encoder_abs_open_fully) == -999999999;'
+          then:
+            - logger.log: "Boot: Referenz ungültig -> Auto-Level..."
+            - button.press: auto_level_button
+          else:
+            - logger.log: "Boot: Referenz gültig -> überspringe Auto-Level."
+            # Number-Entity mit Global synchronisieren (NVS-Restore)
+            - globals.set:
+                id: blind_encoder_rel_closed_fully
+                value: !lambda 'return (int)id(blind_encoder_rel_closed_fully_number).state;'
+            - script.execute: do_publish_blind
+
+esp32:
+  variant: esp32
+  framework:
+    type: esp-idf
+
+logger:
+  baud_rate: 0
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "YAIFM Rollo Fallback"
+    password: !secret fallback_ap_password
+
+captive_portal:
+
+# DRV8833 Sleep/Enable (EEP Pin)
+switch:
+  - platform: gpio
+    id: driver_enable
+    name: "Driver Enable"
+    pin:
+      number: GPIO26
+      mode:
+        output: true
+    restore_mode: ALWAYS_OFF
+
+# Motor PWM (LEDC, direkte Kontrolle wie ned14)
+output:
+  - platform: ledc
+    id: mot_fwd
+    pin: GPIO27
+    frequency: 3662 Hz
+  - platform: ledc
+    id: mot_rev
+    pin: GPIO14
+    frequency: 3662 Hz
+
+# Encoder
+sensor:
+  - platform: rotary_encoder
+    name: "Motor Encoder"
+    id: blind_encoder
+    internal: true
+    pin_a:
+      number: GPIO4
+      mode:
+        input: true
+        pullup: true
+    pin_b:
+      number: GPIO16
+      mode:
+        input: true
+        pullup: true
+    resolution: 4
+    restore_mode: ALWAYS_ZERO
+    min_value: -1000000
+    max_value: 1000000
+
+  - platform: template
+    name: "Encoder Position"
+    icon: "mdi:counter"
+    lambda: |-
+      return isnan(id(blind_encoder).state) ? 0.0f : id(blind_encoder).state;
+    update_interval: 2s
+
+  - platform: template
+    name: "Initialisiert"
+    icon: "mdi:check-circle"
+    lambda: |-
+      return id(blind_encoder_abs_open_fully) != 999999999 && id(blind_encoder_abs_open_fully) != -999999999;
+    update_interval: 2s
+
+# Globale Variablen (wie ned14)
+globals:
+  # Persistente (überleben Reboot/Stromausfall)
+  - id: blind_encoder_rel_closed_fully
+    type: int
+    initial_value: '70000'
+    restore_value: yes
+  - id: blind_encoder_rel_current
+    type: float
+    initial_value: '0.0f'
+    restore_value: yes
+  - id: blind_encoder_abs_open_fully
+    type: int
+    initial_value: '-999999999'
+    restore_value: yes
+  # Flüchtige
+  - id: current_blind_operation
+    type: float
+    initial_value: '0.0f'
+  - id: blind_encoder_stop
+    type: int
+    initial_value: '-999999999'
+  - id: last_blind_encoder_state
+    type: float
+    initial_value: '0.0f'
+  - id: old_current_blind_operation
+    type: float
+    initial_value: '0.0f'
+  - id: old_blind_encoder_rel_current
+    type: float
+    initial_value: '0.0f'
+  - id: auto_level_active
+    type: bool
+    initial_value: 'false'
+
+# Scripte (wie ned14)
+script:
+  - id: do_publish_blind
+    then:
+      - cover.template.publish:
+          id: blind_cover
+          position: !lambda |-
+            float current = ((float)(isnan(id(blind_encoder).state) ? 0 : (int)id(blind_encoder).state) - id(blind_encoder_abs_open_fully)) / (float) id(blind_encoder_rel_closed_fully);
+            if (current <= 0.02f) return COVER_OPEN;
+            if (current >= 0.98f) return COVER_CLOSED;
+            return 1.0f - current;
+          current_operation: !lambda |-
+            if (id(current_blind_operation) < -0.01f) return COVER_OPERATION_OPENING;
+            if (id(current_blind_operation) > 0.01f) return COVER_OPERATION_CLOSING;
+            return COVER_OPERATION_IDLE;
+
+  - id: do_stop_blind_impl
+    then:
+      - globals.set:
+          id: current_blind_operation
+          value: '0.0f'
+      - output.set_level:
+          id: mot_fwd
+          level: 0%
+      - output.set_level:
+          id: mot_rev
+          level: 0%
+
+  - id: do_position_blind
+    mode: restart
+    parameters:
+      pos: float
+      speed: float
+    then:
+      # Sicherheitscheck: Kalibrierung gültig? (NVS korrupt?)
+      - if:
+          condition:
+            lambda: 'return id(blind_encoder_rel_closed_fully) <= 0;'
+          then:
+            - logger.log: "WARNUNG: Kalibrierung ungültig (Schritte=0)! Bewegung blockiert."
+            - script.execute: do_stop_blind_impl
+            - script.stop: do_position_blind
+
+      # Stop angefordert
+      - if:
+          condition:
+            lambda: 'return speed == 0.0f;'
+          then:
+            - script.execute: do_stop_blind_impl
+            - globals.set:
+                id: blind_encoder_rel_current
+                value: !lambda |-
+                  float current = ((float)(isnan(id(blind_encoder).state) ? 0 : (int)id(blind_encoder).state) - id(blind_encoder_abs_open_fully)) / (float) id(blind_encoder_rel_closed_fully);
+                  return current;
+            - script.execute: do_publish_blind
+            - script.stop: do_position_blind
+
+      # Auto-Level erzwingen bei Position 0.0 (ganz offen)
+      - if:
+          condition:
+            lambda: 'return pos <= 0.001f && speed > 0.0f;'
+          then:
+            - logger.log: "Position 0.0 -> Erzwinge Auto-Level bis Stall"
+            - globals.set:
+                id: auto_level_active
+                value: 'true'
+            - globals.set:
+                id: blind_encoder_abs_open_fully
+                value: '-999999999'
+
+      # Ziel berechnen
+      - globals.set:
+          id: blind_encoder_stop
+          value: !lambda 'return id(blind_encoder_abs_open_fully) + (int)((float) id(blind_encoder_rel_closed_fully) * pos);'
+      - globals.set:
+          id: old_current_blind_operation
+          value: '0.0f'
+
+      - logger.log:
+          format: "Position %f angefordert, aktuell %f, Ziel-Encoder %d"
+          args:
+            - 'pos'
+            - '((float)(isnan(id(blind_encoder).state) ? 0 : (int)id(blind_encoder).state) - id(blind_encoder_abs_open_fully)) / (float) id(blind_encoder_rel_closed_fully)'
+            - 'id(blind_encoder_stop)'
+
+      # Bewegungs-Loop
+      - while:
+          condition:
+            lambda: |-
+              // Auto-Level: immer weiterfahren, nie bei Position stoppen
+              if (id(auto_level_active)) return true;
+              float current = ((float)(isnan(id(blind_encoder).state) ? 0 : (int)id(blind_encoder).state) - id(blind_encoder_abs_open_fully)) / (float) id(blind_encoder_rel_closed_fully);
+              return abs(current - pos) > 0.001f;
+          then:
+            - lambda: |-
+                int enc = isnan(id(blind_encoder).state) ? 0 : (int)id(blind_encoder).state;
+                if (enc > id(blind_encoder_stop)) {
+                  if (enc - id(blind_encoder_stop) <= 1000)
+                    id(current_blind_operation) = -0.25f;
+                  else
+                    id(current_blind_operation) = -1.0f * speed;
+                } else {
+                  if (id(blind_encoder_stop) - enc <= 1000)
+                    id(current_blind_operation) = 0.25f;
+                  else
+                    id(current_blind_operation) = 1.0f * speed;
+                }
+                if (id(old_current_blind_operation) == 0.0f)
+                  id(old_current_blind_operation) = id(current_blind_operation);
+                id(last_blind_encoder_state) = (float)enc;
+            - script.execute: do_publish_blind
+            - output.set_level:
+                id: mot_fwd
+                level: !lambda 'return (id(current_blind_operation) > 0) ? abs(id(current_blind_operation)) : 0.0f;'
+            - output.set_level:
+                id: mot_rev
+                level: !lambda 'return (id(current_blind_operation) < 0) ? abs(id(current_blind_operation)) : 0.0f;'
+            # 250ms warten (Stall-Erkennung)
+            - delay: 250ms
+            # Stall pruefen
+            - if:
+                condition:
+                  lambda: |-
+                    int enc = isnan(id(blind_encoder).state) ? 0 : (int)id(blind_encoder).state;
+                    return id(last_blind_encoder_state) == (float)enc;
+                then:
+                  - logger.log:
+                      format: "Stall bei Encoder %f -> Motor aus"
+                      args: ['id(last_blind_encoder_state)']
+                  - if:
+                      condition:
+                        lambda: 'return id(old_current_blind_operation) < 0;'
+                      then:
+                        - globals.set:
+                            id: blind_encoder_abs_open_fully
+                            value: '0'
+                        - sensor.rotary_encoder.set_value:
+                            id: blind_encoder
+                            value: 0
+                        - globals.set:
+                            id: blind_encoder_rel_current
+                            value: '0.0f'
+                        - logger.log: "Neue offen-Referenz gesetzt. Encoder = 0."
+                  - globals.set:
+                      id: auto_level_active
+                      value: 'false'
+                  - script.execute: do_stop_blind_impl
+                  - script.execute: do_publish_blind
+                  - script.stop: do_position_blind
+
+      # Ziel erreicht
+      - logger.log: "Ziel erreicht."
+      - globals.set:
+          id: blind_encoder_rel_current
+          value: !lambda |-
+            float current = ((float)(isnan(id(blind_encoder).state) ? 0 : (int)id(blind_encoder).state) - id(blind_encoder_abs_open_fully)) / (float) id(blind_encoder_rel_closed_fully);
+            return current;
+      - globals.set:
+          id: auto_level_active
+          value: 'false'
+      - script.execute: do_stop_blind_impl
+      - script.execute: do_publish_blind
+
+# Konfigurierbare Werte
+number:
+  - platform: template
+    name: "Schritte bis ganz geschlossen"
+    icon: "mdi:arrow-expand-down"
+    id: blind_encoder_rel_closed_fully_number
+    optimistic: true
+    restore_value: true
+    initial_value: 70000
+    min_value: 0
+    max_value: 500000
+    step: 1000
+    set_action:
+      - globals.set:
+          id: blind_encoder_rel_closed_fully
+          value: !lambda 'return (int)x;'
+
+  - platform: template
+    name: "Motorgeschwindigkeit (%)"
+    icon: "mdi:speedometer"
+    id: motor_speed_config
+    optimistic: true
+    restore_value: true
+    initial_value: 80
+    min_value: 20
+    max_value: 100
+    step: 5
+
+# Cover
+cover:
+  - platform: template
+    id: blind_cover
+    name: "Rollo"
+    device_class: blind
+    has_position: true
+    open_action:
+      - script.execute:
+          id: do_position_blind
+          pos: 0.0
+          speed: !lambda 'return id(motor_speed_config).state / 100.0f;'
+    close_action:
+      - if:
+          condition:
+            lambda: 'return id(blind_encoder_abs_open_fully) == -999999999;'
+          then:
+            - logger.log: "WARNUNG: Referenz ungültig! Schließen blockiert. Erst Auto-Level!"
+            - cover.template.publish:
+                id: blind_cover
+                current_operation: IDLE
+          else:
+            - script.execute:
+                id: do_position_blind
+                pos: 1.0
+                speed: !lambda 'return id(motor_speed_config).state / 100.0f;'
+    stop_action:
+      - script.execute:
+          id: do_position_blind
+          pos: 0.0
+          speed: 0.0
+    position_action:
+      - if:
+          condition:
+            lambda: 'return id(blind_encoder_abs_open_fully) == -999999999;'
+          then:
+            - logger.log: "WARNUNG: Referenz ungültig! Position blockiert. Erst Auto-Level!"
+            - cover.template.publish:
+                id: blind_cover
+                current_operation: IDLE
+          else:
+            - script.execute:
+                id: do_position_blind
+                pos: !lambda 'return 1.0f - pos;'
+                speed: !lambda 'return id(motor_speed_config).state / 100.0f;'
+
+# Buttons
+button:
+  - platform: template
+    name: "Auto-Level"
+    id: auto_level_button
+    icon: "mdi:sync"
+    on_press:
+      - logger.log: "Auto-Level: Start..."
+      - switch.turn_on: driver_enable
+      - delay: 500 ms
+      - script.execute:
+          id: do_position_blind
+          pos: 0.0
+          speed: 1.0
+      - script.wait: do_position_blind
+      - logger.log: "Auto-Level abgeschlossen."
+
+  - platform: template
+    name: "Position als Unten speichern"
+    icon: "mdi:arrow-expand-down"
+    on_press:
+      - lambda: |-
+          int current_enc = isnan(id(blind_encoder).state) ? 0 : (int)id(blind_encoder).state;
+          id(blind_encoder_rel_closed_fully) = current_enc - id(blind_encoder_abs_open_fully);
+          id(blind_encoder_rel_closed_fully_number).publish_state((float)id(blind_encoder_rel_closed_fully));
+          ESP_LOGI("calib", "UNTEN gespeichert: %d Schritte", id(blind_encoder_rel_closed_fully));
+
+  - platform: template
+    name: "Test: Motor Hoch"
+    icon: "mdi:arrow-up"
+    on_press:
+      - logger.log: "TEST: Motor Hoch gedrueckt"
+      - script.stop: do_position_blind
+      - script.execute: do_stop_blind_impl
+      - switch.turn_on: driver_enable
+      - delay: 100 ms
+      - output.set_level:
+          id: mot_rev
+          level: 100%
+      - delay: 2s
+      - output.set_level:
+          id: mot_rev
+          level: 0%
+      - logger.log: "TEST: Motor Hoch fertig"
+
+  - platform: template
+    name: "Test: Motor Runter"
+    icon: "mdi:arrow-down"
+    on_press:
+      - logger.log: "TEST: Motor Runter gedrueckt"
+      - script.stop: do_position_blind
+      - script.execute: do_stop_blind_impl
+      - switch.turn_on: driver_enable
+      - delay: 100 ms
+      - output.set_level:
+          id: mot_fwd
+          level: 100%
+      - delay: 2s
+      - output.set_level:
+          id: mot_fwd
+          level: 0%
+      - logger.log: "TEST: Motor Runter fertig"
+
+  - platform: template
+    name: "NOT-AUS"
+    icon: "mdi:emergency"
+    on_press:
+      - script.execute: do_stop_blind_impl
+      - switch.turn_off: driver_enable
+      - cover.template.publish:
+          id: blind_cover
+          current_operation: IDLE
+      - logger.log: "NOT-AUS! Motor gestoppt, Driver aus."
+
+  - platform: template
+    name: "Neustart"
+    icon: "mdi:restart"
+    on_press:
+      - delay: 500 ms
+      - lambda: |-
+          esp_restart();
