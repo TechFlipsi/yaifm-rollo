@@ -61,7 +61,11 @@ esphome:
           condition:
             lambda: 'return id(blind_encoder_abs_open_fully) == -999999999;'
           then:
-            - logger.log: "Boot: Referenz ungültig -> Auto-Level..."
+            # 80s warten bevor Motor startet — ESPHome Safe-Mode muss erst
+            # Firmware als "successful" markieren, sonst OTA Rollback bei Brownout
+            - logger.log: "Boot: Referenz ungültig -> warte 80s (Safe-Mode) dann Auto-Level..."
+            - delay: 80s
+            - logger.log: "Boot: Safe-Mode vorbei -> starte Auto-Level..."
             - button.press: auto_level_button
           else:
             - logger.log: "Boot: Referenz gültig -> überspringe Auto-Level."
