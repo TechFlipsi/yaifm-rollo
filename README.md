@@ -194,6 +194,23 @@ Diese Lösung ist zuverlässiger als Software-PWM auf 0 zu setzen, weil der ESP3
 - Nach Reboot: wenn Referenz gültig → Auto-Level wird übersprungen, Werte synchronisiert
 - Nach Reboot: wenn Referenz ungültig → Auto-Level läuft automatisch
 
+## Bekannte Einschränkungen
+
+### Positions-Drift bei häufigen Teilfahrten
+
+Bei häufigem Positionieren auf Zwischenpositionen (z.B. 25%, 50%) kann es zu einer **leichten Verschiebung der Endposition** kommen. Ursachen:
+
+- **Slow-Down Stall**: Der Motor fährt im letzten Tick-Bereich mit 25% Speed. Bei manchen Rollos hat der Motor bei 25% nicht genug Kraft → Stall wird fälschlich erkannt → Motor stoppt wenige Ticks vor dem Ziel. Über viele Fahrten summiert sich dieser Fehler.
+- **Mechanisches Spiel**: Der Stoff dehnt/spannt sich unterschiedlich je nach Richtung und Position. Der Encoder misst die Motorwelle, nicht die Stoffposition — kleine Abweichungen sind möglich.
+- **Stall bei normalem Positionieren**: Wenn der Motor beim Erreichen der Zielposition stalled (z.B. durch Widerstand im Mechanismus), wird die aktuelle Position gespeichert — die kann einige Ticks vom echten Ziel abweichen.
+
+**Abhilfe:**
+- Regelmäßiges **Auto-Level** (Button in HA drücken) korrigiert die Referenz neu
+- Komplett Öffnen (0%) startet automatisch ein Auto-Level und referenziert neu
+- Bei präzisen Anwendungen: Nach mehreren Teilfahrten einmal komplett öffnen und wieder schließen
+
+> ⚠️ In der Praxis (3 Rollos über mehrere Wochen getestet) ist die Drift minimal (<1%) und kaum merklich. Die Chance besteht theoretisch, ist aber selten.
+
 ## Lizenz
 
 Dieses Projekt verwendet eine doppelte Lizenz:
