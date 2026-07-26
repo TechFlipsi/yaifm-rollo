@@ -98,6 +98,21 @@ GND           ->  Gemeinsame Masse für alle Komponenten
 
 Der GA12-N20 Motor wird in das IKEA Fridans Rollo-Rohr eingesetzt. Die originale manuelle Kurbel wird durch den Motor ersetzt. Der Encoder sitzt direkt am Motor und erfasst jede Umdrehung.
 
+#### Warum der EEP-Pin (Sleep/Enable) — und nicht einfach IN1/IN2 direkt
+
+Der DRV8833 hat einen EEP-Pin (Enable/Sleep). Wenn EEP LOW ist, ist der Treiber **komplett deaktiviert** — beide H-Brücken-Ausgänge gehen auf High-Z (hochohmig), der Motor bekommt keinen Strom.
+
+Wir verwenden GPIO26 als EEP mit `restore_mode: ALWAYS_OFF`. Das bedeutet:
+
+1. **Beim Booten ist der Treiber sofort OFF** — der ESP32 bootet, GPIO26 ist LOW, der DRV8833 schläft. Erst nach 2 Sekunden (bewusst verzögert) wird der Driver aktiviert.
+2. **PWM-Ausgänge (IN1/IN2) können beliebige Zustände haben** — solange EEP LOW ist, passiert nichts. Der Motor bewegt sich nicht.
+
+> ⚠️ **Das Problem das wir hatten:** Ohne EEP hatten die PWM-Pins (GPIO14, GPIO27) beim Booten kurzzeitig undefinierte Zustände. Der DRV8833 interpretierte das als Ansteuerung und der Motor fuhr **Vollgas in eine zufällige Richtung** — unkontrolliert, bis ESPHome fertig initialisiert war. Bei einem Rollo das oben an der Decke hängt ist das nicht ideal.
+>
+> **Die Lösung:** EEP-Pin auf GPIO26, `ALWAYS_OFF` beim Boot. Der Treiber ist tot bis wir ihn bewusst aktivieren. Erst wenn `on_boot` durchgelaufen ist (Motor aus → 2s warten → Driver an → 1s warten → Auto-Level), bekommt der Motor Strom. Keine unkontrollierten Fahrten mehr.
+
+Diese Lösung ist zuverlässiger als Software-PWM auf 0 zu setzen, weil der ESP32 während des Boot-Prozesses GPIO-Pins nicht garantiert kontrollieren kann. Hardware-Seitig den Treiber deaktivieren ist die saubere Lösung.
+
 #### Verdrahtungsplan (Übersicht)
 
 ```
