@@ -35,6 +35,96 @@ GPIO26        ->  DRV8833 EEP (Sleep/Enable)
 GND           ->  Encoder GND + DRV8833 GND
 ```
 
+### Verdrahtung (komplette Anschluss-Anleitung)
+
+#### Benötigte Bauteile
+
+| Bauteil | Menge | Hinweis |
+|---------|-------|---------|
+| ESP32 DevKit | 1 | Beliebiges ESP32 Board mit GPIO-Pins |
+| DRV8833 H-Bridge | 1 | Motortreiber, 2x H-Brücke |
+| GA12-N20 DC Motor mit Encoder | 1 | 39RPM @ 6V, mit Rotary Encoder |
+| USB-C Kabel | 1 | 5V Stromversorgung für ESP32 |
+| Dupont-Kabel (weiblich-weiblich) | ~10 | Für Verbindungen |
+| IKEA Fridans Raffstore | 1 | Das zu motorisierende Rollo |
+
+#### Schritt-für-Schritt Verkabelung
+
+**1. ESP32 → DRV8833 (Motortreiber)**
+
+```
+ESP32 Pin     ->  DRV8833 Pin
+GPIO14        ->  IN1 (Motor Vorwärts / Runter)
+GPIO27        ->  IN2 (Motor Rückwärts / Hoch)
+GPIO26        ->  EEP (Sleep/Enable — Driver aktivieren/deaktivieren)
+3.3V          ->  VINT (Logik-Spannung, falls vorhanden)
+GND           ->  GND
+```
+
+**2. DRV8833 → Motor**
+
+```
+DRV8833 Pin   ->  Motor Pin
+OUT1          ->  Motor Klemme A (Encoder-Seite)
+OUT2          ->  Motor Klemme B
+VMOT (VIN)    ->  5V (vom ESP32 5V Pin oder USB)
+GND           ->  GND (gemeinsam mit ESP32)
+```
+
+**3. ESP32 → Encoder (Motor-Encoder)**
+
+```
+ESP32 Pin     ->  Encoder Pin
+3.3V          ->  VCC (Encoder Stromversorgung)
+GND           ->  GND (Encoder Masse)
+GPIO4         ->  C2 (Phase B — gelb/weiß)
+GPIO16        ->  C1 (Phase A — grün/blau)
+```
+
+GPIO4 und GPIO16 haben interne Pull-Up-Widerstände aktiviert (`pullup: true` in der YAML). Externe Pull-Ups sind nicht erforderlich.
+
+**4. Stromversorgung**
+
+```
+USB-C Kabel   ->  ESP32 (5V, mindestens 1A)
+ESP32 5V Pin  ->  DRV8833 VMOT/VIN (Motor-Strom)
+ESP32 3.3V    ->  Encoder VCC
+GND           ->  Gemeinsame Masse für alle Komponenten
+```
+
+> ⚠️ **Wichtig:** Alle GND-Pins müssen miteinander verbunden sein (ESP32 GND = DRV8833 GND = Encoder GND). Eine gemeinsame Masse ist zwingend erforderlich, sonst funktioniert die Encoder-Abfrage nicht zuverlässig.
+
+**5. Motor im Rollo einbauen**
+
+Der GA12-N20 Motor wird in das IKEA Fridans Rollo-Rohr eingesetzt. Die originale manuelle Kurbel wird durch den Motor ersetzt. Der Encoder sitzt direkt am Motor und erfasst jede Umdrehung.
+
+#### Verdrahtungsplan (Übersicht)
+
+```
+                    +-----------+
+                    |   ESP32   |
+                    |           |
+  USB-C 5V -------> | 5V    3V3 | ---> Encoder VCC
+                    |           |
+  DRV8833 IN1 <---- | GPIO14    |
+  DRV8833 IN2 <---- | GPIO27    |
+  DRV8833 EEP <---- | GPIO26    |
+  Encoder C1  <--- | GPIO16    |
+  Encoder C2  <--- | GPIO4     |
+                    |           |
+  GND (alle) <----- | GND       |
+                    +-----------+
+                         |
+                    +-----------+
+                    |  DRV8833  |
+                    |           |
+  ESP32 IN1 -----> | IN1   OUT1|---> Motor A
+  ESP32 IN2 -----> | IN2   OUT2|---> Motor B
+  ESP32 EEP -----> | EEP       |
+  ESP32 5V  -----> | VMOT  GND |---> GND (gemeinsam)
+                    +-----------+
+```
+
 ## Installation
 
 1. **secrets.yaml anlegen:**
