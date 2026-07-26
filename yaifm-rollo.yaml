@@ -337,13 +337,18 @@ script:
                       then:
                         # Warten bis Motor ausläuft (Trägheit/Schwerkraft)
                         - delay: 800ms
-                        # Referenz auf tatsächlichen Encoder-Wert setzen (NICHT 0!)
-                        # Verhindert Offset durch Motor-Nachlauf
-                        - lambda: |-
-                            int enc = isnan(id(blind_encoder).state) ? 0 : (int)id(blind_encoder).state;
-                            id(blind_encoder_abs_open_fully) = enc;
-                            id(blind_encoder_rel_current) = 0.0f;
-                            ESP_LOGI("level", "Neue offen-Referenz gesetzt. Encoder = %d", enc);
+                        # Encoder auf 0 resetten UND Referenz auf 0 setzen
+                        # Erst nach Auslauf — verhindert Offset durch Motor-Nachlauf
+                        - sensor.rotary_encoder.set_value:
+                            id: blind_encoder
+                            value: 0
+                        - globals.set:
+                            id: blind_encoder_abs_open_fully
+                            value: '0'
+                        - globals.set:
+                            id: blind_encoder_rel_current
+                            value: '0.0f'
+                        - logger.log: "Neue offen-Referenz gesetzt. Encoder = 0."
                   - globals.set:
                       id: auto_level_active
                       value: 'false'
