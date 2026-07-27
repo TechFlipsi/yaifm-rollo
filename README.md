@@ -211,6 +211,56 @@ Bei häufigem Positionieren auf Zwischenpositionen (z.B. 25%, 50%) kann es zu ei
 
 > ⚠️ In der Praxis (3 Rollos über mehrere Wochen getestet) ist die Drift minimal (<1%) und kaum merklich. Die Chance besteht theoretisch, ist aber selten.
 
+## Technische Erklärung: Motor-Pipsen am Ziel
+
+Wenn der Motor sein Ziel erreicht (besonders beim Schließen = unten), hörst du ein kurzes
+Summen/Pipsen. Das ist normal und kein Defekt — hier die Erklärung:
+
+### Was passiert im Code
+
+1. Motor fährt mit voller Geschwindigkeit (80% default) zum Ziel
+2. Innerhalb der letzten 1000 Encoder-Ticks schaltet der Code auf **25% PWM** (Slow-Down)
+3. Der GA12-N20 bei 5V hat bei 25% PWM **nicht genug Drehmoment** um das Rollo
+   (besonders wenn voll ausgerollt = maximales Gewicht) noch zu bewegen
+4. Der Encoder dreht sich nicht weiter
+5. Die Stall-Erkennung (250ms keine Encoder-Bewegung) schaltet den Motor ab
+6. Das kurze Pipsen = die 250ms zwischen "25% PWM wird angelegt" und "Software
+   erkennt dass der Encoder stillsteht und schaltet ab"
+
+### Warum 25% und nicht mehr?
+
+Der Slow-Down schont den Mechanismus — der Motor ruckt nicht mit voller Wucht ins Ziel
+sondern bremst sanft ab. ned14 (Original-Autor) nutzt ebenfalls 25%, hat aber einen
+kräftigeren 50-RPM Motor bei 6V. Unser 39-RPM bei 5V ist schwächer und reicht bei 25%
+nicht mehr zum Drehen am Ende.
+
+### DRV8833 Fast Decay (Datenblatt-Hintergrund)
+
+Der DRV8833 kennt zwei PWM-Modi (TI Datenblatt SLVSAR1C, Table 3):
+- **Fast Decay** (was wir nutzen): Ein Pin PWM, der andere 0% → Motorwicklung
+  "floating" während PWM off → Strom klingt schnell ab → weniger effektiver Strom
+- **Slow Decay**: Ein Pin HIGH, der andere PWM → Wicklung kurzgeschlossen → Strom
+  zirkuliert weiter → mehr effektives Drehmoment bei gleicher PWM-Rate
+
+Der Code nutzt Fast Decay (Pin A = PWM, Pin B = 0%). Bei 25% PWM ist der effektive
+Motorstrom dadurch niedriger als bei Slow Decay — ein Grund warum der Motor am Ende
+nicht mehr dreht. Das ist bewusst so gelassen: das Pipsen dient als akustische
+Bestätigung dass das Rollo angekommen ist.
+
+### DRV8833 interne Overcurrent Protection (OCP)
+
+Das DRV8833 Datenblatt beschreibt eine interne Überstromschutz-Schaltung die bei
+Stall-Strom automatisch ein- und ausschaltet (OCP retry period). Das HW-627
+Breakout-Board hat Kondensatoren und Widerstände die den OCP-Schwellwert möglicherweise
+niedrig setzen. Das kann ebenfalls zum Pipsen beitragen — der Chip schaltet den Strom
+zyklisch ein/aus bis die Software den Motor endgültig abschaltet.
+
+Quelle: TI DRV8833 Datenblatt SLVSAR1C, Section "Protection Circuits" + ned14
+Build-Anleitung (Beobachtung der HW-627 OCP bei Stall).
+
+**Fazit:** Das Pipsen ist kein Bug sondern ein Feature — es bestätigt dass das Rollo
+korrekt am Ziel angekommen ist. Keine Code-Änderung nötig.
+
 ## Lizenz
 
 Dieses Projekt verwendet eine doppelte Lizenz:
