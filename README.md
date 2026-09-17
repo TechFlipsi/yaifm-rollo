@@ -2,6 +2,8 @@
 
 ESPHome Firmware für motorisierte IKEA Fridans Raffstores mit ESP32-WROOM-32D.
 
+🌐 **[Projektseite & Anleitung](https://techflipsi.kirchweger.de/projekte/yaifm-rollo.html)**
+
 ## Features
 
 - **Kein Endstop** — beide Richtungen stoppen über Encoder-Werte + Stall-Detection
